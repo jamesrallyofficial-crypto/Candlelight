@@ -153,32 +153,46 @@ document.addEventListener('DOMContentLoaded', () => {
    * Handles the submission of a message.
    */
   async function handleMessageSubmit(): Promise<void> {
-    const message = messageInput.value.trim();
-    if (message.length === 0) return;
+    try {
+      const message = messageInput.value.trim();
+      if (message.length === 0) return;
 
-    submitMessageBtn.disabled = true;
-    submitMessageBtn.textContent = 'Granskar...';
-    errorMessage.style.display = 'none';
+      submitMessageBtn.disabled = true;
+      submitMessageBtn.textContent = 'Granskar...';
+      errorMessage.style.display = 'none';
 
-    const moderationResult = await moderateMessage(message);
+      const moderationResult = await moderateMessage(message);
 
-    if (moderationResult === 'SAFE') {
-      const success = await saveMessageToBackend(message);
-      if (success) {
-        addCandleToScene(message, false);
-        updateView();
-        setInteractionState('thanks');
+      if (moderationResult === 'SAFE') {
+        const success = await saveMessageToBackend(message);
+        if (success) {
+          addCandleToScene(message, false);
+          updateView();
+          setInteractionState('thanks');
+          // Reset UI to initial state after a delay to allow lighting more candles
+          setTimeout(() => {
+            setInteractionState('initial');
+          }, 3000);
+        } else {
+          errorMessage.textContent = 'Kunde inte spara meddelandet. Försök igen.';
+          errorMessage.style.display = 'block';
+          submitMessageBtn.disabled = false;
+          submitMessageBtn.textContent = 'Skicka';
+        }
       } else {
-        errorMessage.textContent = 'Kunde inte spara meddelandet. Försök igen.';
+        errorMessage.textContent = 'Meddelandet godkändes inte. Vänligen justera och försök igen.';
         errorMessage.style.display = 'block';
         submitMessageBtn.disabled = false;
         submitMessageBtn.textContent = 'Skicka';
       }
-    } else {
-      errorMessage.textContent = 'Meddelandet godkändes inte. Vänligen justera och försök igen.';
-      errorMessage.style.display = 'block';
-      submitMessageBtn.disabled = false;
-      submitMessageBtn.textContent = 'Skicka';
+    } catch (error) {
+        console.error("A critical error occurred during message submission:", error);
+        errorMessage.textContent = 'Ett oväntat fel inträffade. Vänligen försök igen senare.';
+        errorMessage.style.display = 'block';
+        if (submitMessageBtn) {
+            submitMessageBtn.disabled = false;
+            submitMessageBtn.textContent = 'Skicka';
+        }
     }
   }
 
