@@ -1,0 +1,59 @@
+<!doctype html>
+<html lang="sv">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>En plats för ljus och minne</title>
+    <link rel="stylesheet" href="index.css" />
+  <script type="importmap">
+{
+  "imports": {
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
+    "@vercel/kv": "https://aistudiocdn.com/@vercel/kv@^3.0.0"
+  }
+}
+</script>
+</head>
+  <body>
+    <div id="memorial-scene">
+      <div id="candle-container"></div>
+    </div>
+
+    <div id="message-display" class="hidden">
+      <p id="message-text"></p>
+      <button id="close-message-btn">&times;</button>
+    </div>
+
+    <div id="ui-container">
+      <header>
+        <h1>En plats för ljus och minne</h1>
+        <p>
+          Varje ljus representerar ett stöd i kampen mot psykisk ohälsa och en
+          tanke till de vi förlorat.
+        </p>
+      </header>
+      <div class="counter">
+        <span id="candle-count">0</span> ljus har tänts för att minnas.
+      </div>
+
+      <div id="interaction-area">
+        <button id="light-candle-btn">Tänd ett ljus</button>
+        <div id="message-input-area" style="display: none">
+          <textarea
+            id="message-input"
+            placeholder="Lämna ett varmt meddelande (max 150 tecken)..."
+            maxlength="150"
+            aria-label="Meddelande"
+          ></textarea>
+          <button id="submit-message-btn">Skicka</button>
+          <p id="error-message" style="display: none; color: #ff8a80; margin-top: 10px;"></p>
+        </div>
+        <p id="thank-you-message" style="display: none">
+          Tack för att du visade ditt stöd.
+        </p>
+      </div>
+    </div>
+
+    <script type="module" src="/index.tsx"></script>
+  </body>
+</html>
