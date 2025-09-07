@@ -3,21 +3,22 @@ import { GoogleGenAI } from '@google/genai';
 
 const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-const systemInstruction = `Du är en innehållsmoderator för en känslig minnessida online för suicidprevention. Ditt uppdrag är att säkerställa att alla meddelanden är säkra, respektfulla och lämpliga. Tonen på minnessidan är sorgsen, hoppfull och stöttande.
+const systemInstruction = `Du är en innehållsmoderator för en känslig minnessida online för suicidprevention. Ditt uppdrag är att säkerställa att alla meddelanden är säkra, respektfulla och stöttande.
 
-Tillåtna meddelanden inkluderar:
-- Meddelanden om hopp och stöd (t.ex. "Du är inte ensam", "Det finns hopp").
-- Personliga minnesmeddelanden (t.ex. "Till minne av en älskad vän", "Vi saknar dig").
-- Korta, innerliga uttryck (t.ex. "En tanke", "Jag älskar dig", "❤️").
+**Regler:**
+- **Tillåt:** Meddelanden om hopp, stöd, personliga minnen, och korta, innerliga uttryck (t.ex. "Du är inte ensam", "Vi saknar dig", "❤️", "Tack fina").
+- **Tillåt inte:** Hat, trakasserier, glorifiering av självskada, spam, eller respektlösa meddelanden.
 
-Otillåtna meddelanden inkluderar:
-- Hatpropaganda, trakasserier eller mobbning.
-- Glorifiering eller uppmuntran till självskadebeteende.
-- Spam eller reklam.
-- Grafiskt eller våldsamt innehåll.
-- Meddelanden som är respektlösa eller trivialiserande.
+**Ditt svar måste vara ETT ENDA ORD: antingen SAFE eller UNSAFE.**
 
-Analysera följande meddelande och svara ENDAST med ordet "SAFE" om det är tillåtet, eller "UNSAFE" om det inte är det.`;
+**Exempel:**
+Input: "Jag tänker på dig"
+Output: SAFE
+
+Input: "Vilken hemsk sida"
+Output: UNSAFE
+
+Analysera meddelandet i prompten och svara.`;
 
 export default async function handler(request, response) {
   if (request.method !== 'POST') {
@@ -33,25 +34,23 @@ export default async function handler(request, response) {
 
     const genAIResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: message, // Skicka bara det rena meddelandet
+        contents: message,
         config: {
             systemInstruction: systemInstruction,
             temperature: 0,
         },
     });
     
-    // Trimma bort eventuella extra tecken och gör om till versaler för en säker jämförelse.
     const rawResult = genAIResponse.text.trim().toUpperCase();
-    // Städa bort eventuella markdown-tecken som citattecken eller backticks.
-    // Detta gör kontrollen mer robust.
-    const result = rawResult.replace(/["`]/g, '');
+    // Ta bort allt som inte är en bokstav för att fånga "SAFE" även om det är formaterat som \`SAFE\` eller "SAFE".
+    const result = rawResult.replace(/[^A-Z]/g, '');
 
-    // Använd .includes() för en mer robust kontroll
-    if (result.includes('SAFE')) {
+    if (result === 'SAFE') {
         return response.status(200).json({ result: 'SAFE' });
     }
     
-    // Alla svar förutom "SAFE" behandlas som osäkra.
+    // Logga vid misslyckande för enklare felsökning
+    console.log(`Moderation failed for message: "${message}". AI response: "${rawResult}"`);
     return response.status(200).json({ result: 'UNSAFE' });
 
   } catch (error) {
