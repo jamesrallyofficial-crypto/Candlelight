@@ -33,7 +33,7 @@ export default async function handler(request, response) {
 
     const genAIResponse = await ai.models.generateContent({
         model: "gemini-2.5-flash",
-        contents: `Meddelande: "${message}"`,
+        contents: message, // Skicka bara det rena meddelandet
         config: {
             systemInstruction: systemInstruction,
             temperature: 0,
@@ -46,7 +46,8 @@ export default async function handler(request, response) {
     // Detta gör kontrollen mer robust.
     const result = rawResult.replace(/["`]/g, '');
 
-    if (result === 'SAFE') {
+    // Använd .includes() för en mer robust kontroll
+    if (result.includes('SAFE')) {
         return response.status(200).json({ result: 'SAFE' });
     }
     
