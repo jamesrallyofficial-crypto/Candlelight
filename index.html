@@ -3,13 +3,13 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>En plats för ljus och minne</title>
+    <title>Suicidpreventiva dagen – En plats för ljus och minne</title>
     <link rel="stylesheet" href="index.css" />
-  <script type="importmap">
+<script type="importmap">
 {
   "imports": {
-    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0",
-    "@vercel/kv": "https://aistudiocdn.com/@vercel/kv@^3.0.0"
+    "@vercel/kv": "https://aistudiocdn.com/@vercel/kv@^3.0.0",
+    "@google/genai": "https://aistudiocdn.com/@google/genai@^1.17.0"
   }
 }
 </script>
@@ -26,19 +26,18 @@
 
     <div id="ui-container">
       <header>
-        <h1>En plats för ljus och minne</h1>
+        <h1>Tänd ett ljus den 10 september</h1>
         <p>
-          Varje ljus representerar ett stöd i kampen mot psykisk ohälsa och en
-          tanke till de vi förlorat.
+          På Suicidpreventiva dagen tänder vi ljus för att minnas de vi förlorat, stötta de som kämpar och sprida hopp.
         </p>
       </header>
       <div class="counter">
         <span id="candle-count">0</span> ljus har tänts för att minnas.
       </div>
 
-      <div id="interaction-area">
+      <div id="interaction-area" class="state-initial">
         <button id="light-candle-btn">Tänd ett ljus</button>
-        <div id="message-input-area" style="display: none">
+        <div id="message-input-area">
           <textarea
             id="message-input"
             placeholder="Lämna ett varmt meddelande (max 150 tecken)..."
@@ -48,7 +47,7 @@
           <button id="submit-message-btn">Skicka</button>
           <p id="error-message" style="display: none; color: #ff8a80; margin-top: 10px;"></p>
         </div>
-        <p id="thank-you-message" style="display: none">
+        <p id="thank-you-message">
           Tack för att du visade ditt stöd.
         </p>
       </div>
