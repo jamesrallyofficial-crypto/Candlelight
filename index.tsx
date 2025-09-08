@@ -246,38 +246,40 @@ function hideMessage(): void {
  * Creates and adds a shooting star element to the scene.
  */
 function createShootingStar(): void {
-  if (!memorialScene) return;
+    if (!memorialScene) return;
 
-  const wrapper = document.createElement('div');
-  wrapper.className = 'shooting-star-wrapper';
+    const star = document.createElement('div');
+    star.className = 'shooting-star';
 
-  const star = document.createElement('div');
-  star.className = 'shooting-star';
+    // Define a trajectory across the screen
+    const startX = Math.random() * window.innerWidth;
+    const startY = -50; // Start above the screen
+    const endX = Math.random() * window.innerWidth;
+    const endY = window.innerHeight + 50; // End below the screen
+    
+    const duration = Math.random() * 4 + 6; // Slower, more majestic: 6-10 seconds
 
-  const startX = Math.random() * window.innerWidth;
-  const startY = Math.random() * window.innerHeight * 0.4;
-  const angle = Math.random() * 45 + 20;
-  const duration = Math.random() * 2 + 1.5;
+    // Set custom properties for the animation
+    star.style.setProperty('--start-x', `${startX}px`);
+    star.style.setProperty('--start-y', `${startY}px`);
+    star.style.setProperty('--end-x', `${endX}px`);
+    star.style.setProperty('--end-y', `${endY}px`);
+    star.style.animation = `shoot ${duration}s ease-in-out forwards`;
 
-  wrapper.style.left = `${startX}px`;
-  wrapper.style.top = `${startY}px`;
-  wrapper.style.transform = `rotate(${angle}deg)`;
-  
-  star.style.animationDuration = `${duration}s`;
+    star.addEventListener('animationend', () => {
+        star.remove();
+    });
 
-  star.addEventListener('animationend', () => {
-    wrapper.remove();
-  });
-
-  wrapper.appendChild(star);
-  memorialScene.appendChild(wrapper);
+    memorialScene.appendChild(star);
 }
+
 
 /**
  * Schedules the next shooting star to appear after a random delay.
+ * @param isFirst - If true, schedule the first star to appear quickly.
  */
-function scheduleNextShootingStar(): void {
-  const delay = Math.random() * 15000 + 10000; // 10-25 seconds
+function scheduleNextShootingStar(isFirst = false): void {
+  const delay = isFirst ? 2000 : Math.random() * 15000 + 10000; // First in 2s, then 10-25s
   setTimeout(() => {
     createShootingStar();
     scheduleNextShootingStar();
@@ -295,7 +297,7 @@ function initialize(): void {
   
   checkSessionState();
   updateView();
-  scheduleNextShootingStar();
+  scheduleNextShootingStar(true);
 
   // --- Event Listeners ---
   if (messageForm) {
@@ -363,4 +365,4 @@ function initialize(): void {
 }
 
 // --- Start the application ---
-initialize();
+document.addEventListener('DOMContentLoaded', initialize);
