@@ -27,20 +27,23 @@
       <header>
         <h1>En plats för ljus och minne</h1>
         <p>
-          Varje ljus representerar ett stöd i kampen mot psykisk ohälsa och en
-          tanke till de vi förlorat.
+          Med anledning av Suicidpreventionsdagen. Varje ljus representerar ett stöd och en tanke till de vi förlorat.
         </p>
       </header>
       <div class="counter">
         <span id="candle-count">0</span> ljus har tänts för att minnas.
       </div>
 
-      <p class="explanatory-text">Klicka på knappen för att tända ett ljus av hopp och stöd. Ditt ljus ansluter sig till de andra och lyser upp mörkret.</p>
-
+      <form id="message-form">
+        <p class="explanatory-text">Skriv ett anonymt meddelande av hopp, stöd eller minne. Klicka sedan för att tända ditt ljus.</p>
+        <textarea id="message-input" name="message" rows="3" maxlength="150" placeholder="Ditt meddelande..."></textarea>
+        <p id="error-message" class="error-hidden"></p>
+        <button id="light-candle-btn" type="submit">Tänd ett ljus</button>
+      </form>
+      
       <div id="interaction-area">
-        <button id="light-candle-btn">Tänd ett ljus</button>
         <p id="thank-you-message" style="display: none">
-          Tack för att du tände ett ljus och visade ditt stöd.
+          Tack för ditt meddelande. Ditt ljus lyser nu tillsammans med de andra.
         </p>
       </div>
     </div>
