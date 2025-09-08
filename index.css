@@ -291,43 +291,41 @@ body {
   }
 }
 
-.shooting-star-wrapper {
-  position: absolute;
-  z-index: 1;
-  width: 150px;
-  height: 2px;
-}
-
 .shooting-star {
-  width: 2px;
-  height: 2px;
-  background: #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 0 6px 2px #ffffff;
-  animation: shoot linear forwards;
+    position: absolute;
+    z-index: 1;
+    width: 2px;
+    height: 2px;
+    background: #ffffff;
+    border-radius: 50%;
+    box-shadow: 0 0 8px 3px #ffffff;
+    opacity: 0;
 }
 
 .shooting-star::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  right: 2px;
-  width: 150px;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0.6), transparent);
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 1px;
+    transform: translateY(-50%) rotate(45deg); /* The tail streams from behind */
+    transform-origin: top left;
+    width: 1px;
+    height: 150px;
+    background: linear-gradient(to bottom, rgba(255, 255, 255, 0.6), transparent);
 }
 
+
 @keyframes shoot {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(150vw);
-    opacity: 0;
-  }
+    0% {
+        transform: translate(var(--start-x), var(--start-y));
+        opacity: 1;
+    }
+    100% {
+        transform: translate(var(--end-x), var(--end-y));
+        opacity: 0;
+    }
 }
+
 
 @media (max-width: 768px) {
   #ui-container {
