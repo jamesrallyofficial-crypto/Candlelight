@@ -1,14 +1,8 @@
 {
-  "name": "memorial-functions",
+  "name": "candlelight-memorial",
   "version": "1.0.0",
-  "description": "Backend functions for the memorial app",
-  "main": "add-candle.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
-  "license": "ISC",
+  "private": true,
   "dependencies": {
-    "@vercel/kv": "^2.0.0"
+    "@vercel/kv": "^1.0.1"
   }
 }
