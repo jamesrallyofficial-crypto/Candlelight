@@ -1,383 +1,375 @@
-@import url('https://fonts.googleapis.com/css2?family=Crimson+Text:ital@0;1&display=swap');
+/**
+ * @license
+ * SPDX-License-Identifier: Apache-2.0
+ */
 
-:root {
-  --background-sky-top: #0d1a2f;
-  --background-sky-bottom: #243b55;
-  --landscape-color: #050d19;
-  --text-color: #e0e0e0;
-  --glow-color: #ffdca8;
-  --button-bg: rgba(255, 255, 255, 0.1);
-  --button-hover-bg: rgba(255, 255, 255, 0.2);
-  --input-bg: rgba(0, 0, 0, 0.2);
-  --error-color: #ff9d9d;
-}
+import { GoogleGenAI, Type } from "@google/genai";
 
-* {
-  box-sizing: border-box;
-  margin: 0;
-  padding: 0;
-}
-
-html, body {
-  width: 100%;
-  height: 100%;
-  overflow: hidden;
-  font-family: 'Crimson Text', serif;
-}
-
-body {
-  background: linear-gradient(to bottom, var(--background-sky-top), var(--background-sky-bottom));
-  color: var(--text-color);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  position: relative;
-}
-
-#memorial-scene {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  z-index: 1;
-}
-
-#candle-container {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  transform-origin: center center;
-  transition: transform 3s cubic-bezier(0.25, 1, 0.5, 1);
-}
-
-.candle {
-  position: absolute;
-  border-radius: 50%;
-  background-color: white;
-  box-shadow: 
-    0 0 5px 3px var(--glow-color),
-    0 0 15px 8px #ffac33,
-    0 0 30px 15px #a35b00;
-  opacity: 0;
-}
-
-.candle.has-message {
-  cursor: pointer;
-}
+// --- DOM Elements ---
+const memorialScene = document.getElementById('memorial-scene') as HTMLDivElement;
+const candleContainer = document.getElementById('candle-container') as HTMLDivElement;
+const lightCandleBtn = document.getElementById('light-candle-btn') as HTMLButtonElement;
+const candleCountSpan = document.getElementById('candle-count') as HTMLSpanElement;
+const thankYouMessage = document.getElementById('thank-you-message') as HTMLParagraphElement;
+const messageDisplay = document.getElementById('message-display') as HTMLDivElement;
+const messageText = document.getElementById('message-text') as HTMLParagraphElement;
+const closeMessageBtn = document.getElementById('close-message-btn') as HTMLButtonElement;
+const messageForm = document.getElementById('message-form') as HTMLFormElement;
+const messageInput = document.getElementById('message-input') as HTMLTextAreaElement;
+const errorMessage = document.getElementById('error-message') as HTMLParagraphElement;
 
 
-@keyframes fadeIn {
-  from {
-    opacity: 0;
-    transform: scale(0.8);
-  }
-  to {
-    opacity: 0.85;
-    transform: scale(1);
+// --- State and Constants ---
+const LOCAL_STORAGE_KEY = 'suicidePreventionMemorial';
+const INITIAL_CANDLE_COUNT = 75; 
+const ZOOM_FACTOR_PER_CANDLE = 0.002;
+const MAX_ZOOM_OUT = 0.4;
+let candleCount = 0;
+
+const predefinedMessages = [
+  "Du är inte ensam.",
+  "Det finns hopp, även när det känns som mörkast.",
+  "En dag i taget. Du klarar det här.",
+  "Vila. Du behöver inte lösa allt på en gång.",
+  "Din existens gör världen ljusare.",
+  "Till minne av en älskad vän.",
+  "Vi tänker på dig.",
+  "Tillsammans är vi starka.",
+  "Det är okej att inte vara okej.",
+  "Var snäll mot dig själv.",
+  "För de vi saknar, i evigt minne."
+];
+
+// --- Gemini AI Setup ---
+let ai: GoogleGenAI | null = null;
+try {
+  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+} catch (error) {
+  console.error("Failed to initialize GoogleGenAI:", error);
+  // Hide form if AI cannot be initialized
+  if (messageForm) {
+    messageForm.style.display = 'none';
+    showError("Kunde inte ansluta till tjänsten. Försök igen senare.");
   }
 }
 
-@keyframes candleGlow {
-  0%, 100% {
-    opacity: 0.85;
-    box-shadow: 
-      0 0 5px 3px var(--glow-color),
-      0 0 15px 8px #ffac33,
-      0 0 30px 15px #a35b00;
-  }
-  50% {
-    opacity: 0.9;
-    box-shadow: 
-      0 0 8px 4px var(--glow-color),
-      0 0 20px 10px #ffac33,
-      0 0 40px 18px #a35b00;
-  }
-}
-
-
-#ui-container {
-  position: relative;
-  z-index: 2;
-  text-align: center;
-  padding: 2rem;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 8px;
-  max-width: 500px;
-  backdrop-filter: blur(5px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-#ui-container h1 {
-  font-size: 2.5rem;
-  margin-bottom: 0.5rem;
-  font-weight: normal;
-}
-
-#ui-container p {
-  font-size: 1.1rem;
-  font-style: italic;
-  opacity: 0.9;
-  margin-bottom: 1.5rem;
-}
-
-.counter {
-  font-size: 1.2rem;
-  margin-bottom: 1rem;
-  letter-spacing: 1px;
-}
-
-.explanatory-text {
-  font-size: 1.1rem;
-  margin: 0 auto 1.5rem;
-  max-width: 90%;
-  opacity: 0.9;
-  font-style: normal;
-}
-
-#candle-count {
-  font-weight: bold;
-}
-
-#message-form {
-    display: flex;
-    flex-direction: column;
-    gap: 1rem;
-    align-items: center;
-    width: 100%;
-}
-
-#message-input {
-    background: var(--input-bg);
-    color: var(--text-color);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 4px;
-    padding: 0.8rem;
-    font-size: 1rem;
-    font-family: 'Crimson Text', serif;
-    width: 100%;
-    resize: vertical;
-}
-
-#message-input::placeholder {
-    color: rgba(255, 255, 255, 0.5);
-    font-style: italic;
-}
-
-#error-message {
-    color: var(--error-color);
-    font-size: 0.9rem;
-    min-height: 1.2rem; /* Reserve space to prevent layout shift */
-    transition: opacity 0.3s ease;
-}
-
-.error-hidden {
-    opacity: 0;
-}
-
-.error-visible {
-    opacity: 1;
-}
-
-#light-candle-btn {
-  background: var(--button-bg);
-  color: var(--text-color);
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
-  padding: 1rem 1.5rem;
-  font-size: 1rem;
-  font-family: 'Crimson Text', serif;
-  cursor: pointer;
-  transition: background-color 0.3s ease;
-  width: auto;
-}
-
-#light-candle-btn:hover {
-  background: var(--button-hover-bg);
-}
-
-#light-candle-btn:disabled {
-    background-color: rgba(255, 255, 255, 0.05);
-    cursor: not-allowed;
-    color: rgba(255, 255, 255, 0.4);
-}
-
-#thank-you-message {
-  font-style: italic;
-  font-size: 1.1rem;
-}
-
-
-/* Message Display Modal */
-#message-display {
-  position: fixed;
-  z-index: 10;
-  background-color: rgba(0, 0, 0, 0.7);
-  backdrop-filter: blur(5px);
-  padding: 1.2rem;
-  border-radius: 6px;
-  border: 1px solid rgba(255, 255, 255, 0.1);
-  max-width: 300px;
-  text-align: center;
-  transition: opacity 0.3s ease, transform 0.3s ease;
-  transform-origin: 50% 100%; /* Animate from bottom */
-}
-
-#message-display.hidden {
-  display: none;
-  opacity: 0;
-}
-
-#message-display.visible {
-  display: block;
-  opacity: 1;
-}
-
-#message-text {
-  font-style: italic;
-  font-size: 1.1rem;
-  margin-bottom: 0.5rem;
-}
-
-#close-message-btn {
-  position: absolute;
-  top: 5px;
-  right: 8px;
-  background: none;
-  border: none;
-  color: var(--text-color);
-  font-size: 1.5rem;
-  cursor: pointer;
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-}
-
-#close-message-btn:hover {
-  opacity: 1;
-}
-
-/* --- Sparkle Effect --- */
-.sparkle {
-  position: fixed;
-  width: 10px;
-  height: 10px;
-  z-index: 11;
-  pointer-events: none;
-  border-radius: 50%;
-  background-color: transparent; 
-  animation: sparkle-effect 0.8s ease-out forwards;
-}
-
-@keyframes sparkle-effect {
-  0% {
-    opacity: 1;
-    transform: scale(0);
-    box-shadow: 0 0 5px 5px var(--glow-color), 0 0 10px 10px #ffac33, 0 0 20px 20px rgba(163, 91, 0, 0.5);
-  }
-  100% {
-    opacity: 0;
-    transform: scale(2.5);
-    box-shadow: 0 0 5px 15px var(--glow-color), 0 0 10px 25px #ffac33, 0 0 20px 40px rgba(163, 91, 0, 0);
-  }
-}
-
-
-/* --- Responsiveness --- */
-
-/* For tablets and smaller desktops */
-@media (max-width: 768px) {
-  #ui-container {
-    padding: 1.5rem;
-    width: 80vw;
-  }
-
-  #ui-container h1 {
-    font-size: 2rem;
-  }
-
-  #ui-container p {
-    font-size: 1rem;
-  }
-
-  .counter {
-    font-size: 1.1rem;
-    margin-bottom: 1.5rem;
+/**
+ * Uses Gemini to check if a message is appropriate for the memorial.
+ * @param message The user's message.
+ * @returns An object with `isAppropriate` (boolean) and `reason` (string).
+ */
+async function checkMessageAppropriateness(message: string): Promise<{isAppropriate: boolean, reason: string}> {
+  if (!ai) {
+    return { isAppropriate: false, reason: "AI-tjänsten är inte tillgänglig." };
   }
   
-  .explanatory-text {
-    font-size: 1rem;
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Analysera följande meddelande för en digital minnesplats för suicidprevention. Är det lämpligt? Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får absolut inte innehålla skadligt språk, uppmana till självskada, vara hatiskt eller innehålla personlig information. Meddelande: "${message}"`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isAppropriate: {
+              type: Type.BOOLEAN,
+              description: 'Är meddelandet lämpligt enligt riktlinjerna?',
+            },
+            reason: {
+              type: Type.STRING,
+              description: 'En kort anledning om varför det inte är lämpligt.',
+            },
+          },
+          required: ["isAppropriate", "reason"],
+        },
+      },
+    });
+
+    const jsonText = response.text.trim();
+    const result = JSON.parse(jsonText);
+    return {
+        isAppropriate: result.isAppropriate,
+        reason: result.reason || 'Okänt fel.'
+    };
+  } catch (error) {
+    console.error('Error moderating message:', error);
+    return { isAppropriate: false, reason: "Kunde inte verifiera meddelandet. Försök igen." };
+  }
+}
+
+/**
+ * Displays an error message to the user.
+ * @param text The error text to display.
+ */
+function showError(text: string) {
+    if(!errorMessage) return;
+    errorMessage.textContent = text;
+    errorMessage.classList.add('error-visible');
+    errorMessage.classList.remove('error-hidden');
+}
+
+/**
+ * Hides the error message.
+ */
+function hideError() {
+    if(!errorMessage) return;
+    errorMessage.classList.add('error-hidden');
+    errorMessage.classList.remove('error-visible');
+}
+
+
+/**
+ * Creates and adds a single candle element to the scene.
+ * @param message - The message to attach to the candle.
+ * @param isInitial - If true, the candle fades in immediately.
+ * @returns The newly created candle element.
+ */
+function addCandleToScene(message: string, isInitial = false): HTMLDivElement {
+  if (!candleContainer) throw new Error("Candle container not found");
+
+  const candle = document.createElement('div');
+  candle.className = 'candle has-message';
+  candle.dataset.message = message;
+  
+  const x = Math.random() * 95 + 2.5;
+  const y = Math.random() * 95 + 2.5;
+  candle.style.left = `${x}%`;
+  candle.style.top = `${y}%`;
+  
+  const size = Math.random() * 10 + 5;
+  candle.style.width = `${size}px`;
+  candle.style.height = `${size}px`;
+  
+  const flickerDuration = (Math.random() * 2 + 3).toFixed(2); 
+
+  if (isInitial) {
+    const flickerDelay = (3 + Math.random() * 2).toFixed(2);
+    candle.style.animation = `fadeIn 3s ease-out forwards, candleGlow ${flickerDuration}s ease-in-out ${flickerDelay}s infinite alternate`;
+  } else {
+    const userFadeInDuration = 2;
+    const userFadeInDelay = 0.5;
+    const flickerStartTime = userFadeInDuration + userFadeInDelay;
+    candle.style.animation = `fadeIn ${userFadeInDuration}s ease-out ${userFadeInDelay}s forwards, candleGlow ${flickerDuration}s ease-in-out ${flickerStartTime}s infinite alternate`;
+  }
+
+  candleContainer.appendChild(candle);
+  candleCount++;
+  return candle;
+}
+
+/**
+ * Displays a sparkle animation at a specific viewport location.
+ * @param x - The horizontal coordinate.
+ * @param y - The vertical coordinate.
+ */
+function showSparkleAt(x: number, y: number): void {
+  const sparkle = document.createElement('div');
+  sparkle.className = 'sparkle';
+  sparkle.style.left = `${x}px`;
+  sparkle.style.top = `${y}px`;
+  document.body.appendChild(sparkle);
+  sparkle.addEventListener('animationend', () => {
+      sparkle.remove();
+  });
+}
+
+/**
+ * Updates the UI counter and applies the zoom-out effect.
+ */
+function updateView(): void {
+  if (candleCountSpan) {
+    candleCountSpan.textContent = candleCount.toString();
+  }
+
+  if (candleContainer) {
+    const candlesAddedByUser = Math.max(0, candleCount - INITIAL_CANDLE_COUNT);
+    const scale = 1 - (candlesAddedByUser * ZOOM_FACTOR_PER_CANDLE);
+    const finalScale = Math.max(MAX_ZOOM_OUT, scale);
+    candleContainer.style.transform = `scale(${finalScale})`;
+  }
+}
+
+/**
+ * Checks if the user has already lit a candle in a previous session.
+ */
+function checkSessionState(): void {
+  let sessionData = null;
+  try {
+    const storedData = localStorage.getItem(LOCAL_STORAGE_KEY);
+    if (storedData) {
+      sessionData = JSON.parse(storedData);
+    }
+  } catch (e) {
+    console.error('Could not read from localStorage', e);
+  }
+
+  if (sessionData?.hasLit) {
+    if (messageForm && thankYouMessage) {
+      messageForm.style.display = 'none';
+      thankYouMessage.style.display = 'block';
+    }
+    // Add their candle from last time, but without making it clickable for them again.
+    if (sessionData.message) {
+        addCandleToScene(sessionData.message, true);
+    }
+  }
+}
+
+/**
+ * Shows a message in the display modal.
+ * @param candle - The candle element that was clicked.
+ */
+function showMessage(candle: HTMLElement): void {
+  const message = candle.dataset.message;
+  if (!message || !messageDisplay || !messageText) return;
+
+  messageText.textContent = `"${message}"`;
+  
+  const candleRect = candle.getBoundingClientRect();
+  const viewX = candleRect.left + (candleRect.width / 2);
+  const viewY = candleRect.top + (candleRect.height / 2);
+
+  messageDisplay.style.left = `${viewX}px`;
+  messageDisplay.style.top = `${viewY}px`;
+  messageDisplay.style.transform = 'translate(-50%, -120%)';
+  messageDisplay.classList.remove('hidden');
+  messageDisplay.classList.add('visible');
+}
+
+/**
+ * Hides the message display modal.
+ */
+function hideMessage(): void {
+  if (!messageDisplay) return;
+  messageDisplay.classList.remove('visible');
+  setTimeout(() => {
+    if (!messageDisplay.classList.contains('visible')) {
+        messageDisplay.classList.add('hidden');
+    }
+  }, 300);
+}
+
+/**
+ * Creates and adds a shooting star element to the scene.
+ */
+function createShootingStar(): void {
+  if (!memorialScene) return;
+
+  const wrapper = document.createElement('div');
+  wrapper.className = 'shooting-star-wrapper';
+
+  const star = document.createElement('div');
+  star.className = 'shooting-star';
+
+  const startX = Math.random() * window.innerWidth;
+  const startY = Math.random() * window.innerHeight * 0.4;
+  const angle = Math.random() * 45 + 20;
+  const duration = Math.random() * 2 + 1.5;
+
+  wrapper.style.left = `${startX}px`;
+  wrapper.style.top = `${startY}px`;
+  wrapper.style.transform = `rotate(${angle}deg)`;
+  
+  star.style.animationDuration = `${duration}s`;
+
+  star.addEventListener('animationend', () => {
+    wrapper.remove();
+  });
+
+  wrapper.appendChild(star);
+  memorialScene.appendChild(wrapper);
+}
+
+/**
+ * Schedules the next shooting star to appear after a random delay.
+ */
+function scheduleNextShootingStar(): void {
+  const delay = Math.random() * 15000 + 10000; // 10-25 seconds
+  setTimeout(() => {
+    createShootingStar();
+    scheduleNextShootingStar();
+  }, delay);
+}
+
+
+/**
+ * Initializes the memorial scene.
+ */
+function initialize(): void {
+  for (let i = 0; i < INITIAL_CANDLE_COUNT; i++) {
+    const message = predefinedMessages[i % predefinedMessages.length];
+    addCandleToScene(message, true);
   }
   
-  #message-input {
-    font-size: 0.9rem;
+  checkSessionState();
+  updateView();
+  scheduleNextShootingStar();
+
+  // --- Event Listeners ---
+  if (messageForm) {
+    messageForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!messageInput.value.trim()) {
+        showError("Vänligen skriv ett meddelande.");
+        return;
+      }
+      
+      hideError();
+      lightCandleBtn.disabled = true;
+      lightCandleBtn.textContent = 'Tänder ljus...';
+
+      const message = messageInput.value.trim();
+      const moderationResult = await checkMessageAppropriateness(message);
+
+      if (moderationResult.isAppropriate) {
+        const newCandle = addCandleToScene(message, false);
+        updateView();
+
+        requestAnimationFrame(() => {
+            const candleRect = newCandle.getBoundingClientRect();
+            const x = candleRect.left + candleRect.width / 2;
+            const y = candleRect.top + candleRect.height / 2;
+            showSparkleAt(x, y);
+        });
+
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
+        } catch (err) {
+            console.error('Could not save to localStorage', err);
+        }
+
+        if (thankYouMessage) {
+            messageForm.style.display = 'none';
+            thankYouMessage.style.display = 'block';
+        }
+      } else {
+        showError(`Meddelandet kunde inte godkännas. Var snäll och försök formulera om det. (${moderationResult.reason})`);
+        lightCandleBtn.disabled = false;
+        lightCandleBtn.textContent = 'Tänd ett ljus';
+      }
+    });
   }
 
-  #light-candle-btn {
-    padding: 0.8rem 1.2rem;
-    font-size: 0.9rem;
+  if(candleContainer) {
+    candleContainer.addEventListener('click', (e) => {
+        const target = e.target as HTMLElement;
+        if (target.classList.contains('candle') && target.dataset.message) {
+            showMessage(target);
+        }
+    });
   }
+
+  if(closeMessageBtn) {
+    closeMessageBtn.addEventListener('click', hideMessage);
+  }
+
+  document.addEventListener('click', (e) => {
+    if (messageDisplay?.classList.contains('visible') && !messageDisplay.contains(e.target as Node) && !(e.target as HTMLElement).classList.contains('candle')) {
+        hideMessage();
+    }
+  });
 }
 
-/* For mobile phones */
-@media (max-width: 480px) {
-  #ui-container {
-    width: 90vw;
-    padding: 1.5rem 1rem;
-    max-height: 80vh; /* Prevent overflow on small screens */
-    overflow-y: auto; /* Allow scrolling if content is too tall */
-  }
-
-  #ui-container h1 {
-    font-size: 1.8rem;
-  }
-
-  #ui-container p, .explanatory-text {
-    font-size: 0.95rem;
-    margin-bottom: 1rem;
-  }
-  
-  #message-display {
-    max-width: 80vw;
-    padding: 0.8rem;
-    font-size: 0.9rem;
-  }
-}
-
-/* --- Shooting Stars --- */
-.shooting-star-wrapper {
-  position: absolute;
-  z-index: 1; 
-}
-
-.shooting-star {
-  width: 2px;
-  height: 2px;
-  background: #ffffff;
-  border-radius: 50%;
-  box-shadow: 0 0 6px 2px #ffffff;
-  animation: shoot linear forwards;
-}
-
-.shooting-star::after {
-  content: '';
-  position: absolute;
-  top: 50%;
-  transform: translateY(-50%);
-  right: 2px;
-  width: 150px;
-  height: 1px;
-  background: linear-gradient(to right, rgba(255, 255, 255, 0.6), transparent);
-}
-
-@keyframes shoot {
-  0% {
-    transform: translateX(0);
-    opacity: 1;
-  }
-  100% {
-    transform: translateX(150vw);
-    opacity: 0;
-  }
-}
+// --- Start the application ---
+initialize();
