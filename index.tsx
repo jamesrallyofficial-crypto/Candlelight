@@ -78,25 +78,16 @@ async function checkMessageAppropriateness(message: string): Promise<{isAppropri
   }
   
   try {
+    const prompt = `Analysera meddelandet för en minnesplats för suicidprevention. Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får inte innehålla skadligt, hatiskt, självskadeuppmanande innehåll, eller personlig information.
+Svara ENDAST med ett JSON-objekt med exakt denna struktur: { "isAppropriate": boolean, "reason": string }.
+"isAppropriate" ska vara true om meddelandet är lämpligt, annars false. "reason" ska vara en kort förklaring om det är olämpligt, annars en tom sträng.
+Meddelande: "${message}"`;
+
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Analysera meddelandet för en minnesplats för suicidprevention. Svara ENDAST med ett JSON-objekt som följer det givna schemat. Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får inte innehålla skadligt, hatiskt, eller självskadeuppmanande innehåll, eller personlig information. Meddelande: "${message}"`,
+      contents: prompt,
       config: {
         responseMimeType: "application/json",
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            isAppropriate: {
-              type: Type.BOOLEAN,
-              description: 'Är meddelandet lämpligt enligt riktlinjerna?',
-            },
-            reason: {
-              type: Type.STRING,
-              description: 'En kort anledning om varför det inte är lämpligt.',
-            },
-          },
-          required: ["isAppropriate", "reason"],
-        },
       },
     });
 
