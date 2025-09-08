@@ -20,7 +20,7 @@
 
     <div id="message-display" class="hidden">
       <p id="message-text"></p>
-      <button id="close-message-btn">&times;</button>
+      <button id="close-message-btn" aria-label="Stäng meddelande">&times;</button>
     </div>
 
     <div id="ui-container">
@@ -34,18 +34,16 @@
         <span id="candle-count">0</span> ljus har tänts för att minnas.
       </div>
 
-      <form id="message-form">
-        <p class="explanatory-text">Skriv ett anonymt meddelande av hopp, stöd eller minne. Klicka sedan för att tända ditt ljus.</p>
-        <textarea id="message-input" name="message" rows="3" maxlength="150" placeholder="Ditt meddelande..."></textarea>
-        <p id="error-message" class="error-hidden"></p>
+      <form id="message-form" aria-labelledby="form-heading">
+        <p class="explanatory-text" id="form-heading">Skriv ett anonymt meddelande av hopp, stöd eller minne. Klicka sedan för att tända ditt ljus.</p>
+        <textarea id="message-input" name="message" rows="3" maxlength="150" placeholder="Ditt meddelande..." aria-label="Meddelande"></textarea>
+        <p id="error-message" class="error-hidden" role="alert"></p>
         <button id="light-candle-btn" type="submit">Tänd ett ljus</button>
       </form>
       
-      <div id="interaction-area">
-        <p id="thank-you-message" style="display: none">
+      <p id="thank-you-message" style="display: none">
           Tack för ditt meddelande. Ditt ljus lyser nu tillsammans med de andra.
-        </p>
-      </div>
+      </p>
     </div>
     <script type="module" src="/index.tsx"></script>
   </body>
