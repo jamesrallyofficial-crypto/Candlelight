@@ -53,6 +53,21 @@ try {
 }
 
 /**
+ * Cleans potential markdown formatting from a string and parses it as JSON.
+ * @param jsonText The raw text from the AI response.
+ * @returns The parsed JavaScript object.
+ */
+function cleanAndParseJson(jsonText: string): any {
+    let cleanText = jsonText.trim();
+    const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    if (match) {
+        cleanText = match[1];
+    }
+    return JSON.parse(cleanText);
+}
+
+
+/**
  * Uses Gemini to check if a message is appropriate for the memorial.
  * @param message The user's message.
  * @returns An object with `isAppropriate` (boolean) and `reason` (string).
@@ -65,7 +80,7 @@ async function checkMessageAppropriateness(message: string): Promise<{isAppropri
   try {
     const response = await ai.models.generateContent({
       model: "gemini-2.5-flash",
-      contents: `Analysera följande meddelande för en digital minnesplats för suicidprevention. Är det lämpligt? Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får absolut inte innehålla skadligt språk, uppmana till självskada, vara hatiskt eller innehålla personlig information. Meddelande: "${message}"`,
+      contents: `Analysera meddelandet för en minnesplats för suicidprevention. Svara ENDAST med ett JSON-objekt som följer det givna schemat. Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får inte innehålla skadligt, hatiskt, eller självskadeuppmanande innehåll, eller personlig information. Meddelande: "${message}"`,
       config: {
         responseMimeType: "application/json",
         responseSchema: {
@@ -85,10 +100,9 @@ async function checkMessageAppropriateness(message: string): Promise<{isAppropri
       },
     });
 
-    const jsonText = response.text.trim();
-    const result = JSON.parse(jsonText);
+    const result = cleanAndParseJson(response.text);
     return {
-        isAppropriate: result.isAppropriate,
+        isAppropriate: result.isAppropriate === true, // Ensure it's a strict boolean
         reason: result.reason || 'Okänt fel.'
     };
   } catch (error) {
@@ -312,34 +326,41 @@ function initialize(): void {
       lightCandleBtn.disabled = true;
       lightCandleBtn.textContent = 'Tänder ljus...';
 
-      const message = messageInput.value.trim();
-      const moderationResult = await checkMessageAppropriateness(message);
+      try {
+        const message = messageInput.value.trim();
+        const moderationResult = await checkMessageAppropriateness(message);
 
-      if (moderationResult.isAppropriate) {
-        const newCandle = addCandleToScene(message, false);
-        updateView();
+        if (moderationResult.isAppropriate) {
+          const newCandle = addCandleToScene(message, false);
+          updateView();
 
-        requestAnimationFrame(() => {
-            const candleRect = newCandle.getBoundingClientRect();
-            const x = candleRect.left + candleRect.width / 2;
-            const y = candleRect.top + candleRect.height / 2;
-            showSparkleAt(x, y);
-        });
+          requestAnimationFrame(() => {
+              const candleRect = newCandle.getBoundingClientRect();
+              const x = candleRect.left + candleRect.width / 2;
+              const y = candleRect.top + candleRect.height / 2;
+              showSparkleAt(x, y);
+          });
 
-        try {
-            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
-        } catch (err) {
-            console.error('Could not save to localStorage', err);
+          try {
+              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
+          } catch (err) {
+              console.error('Could not save to localStorage', err);
+          }
+
+          if (thankYouMessage) {
+              messageForm.style.display = 'none';
+              thankYouMessage.style.display = 'block';
+          }
+        } else {
+          showError(`Meddelandet kunde inte godkännas. Var snäll och försök formulera om det. (${moderationResult.reason})`);
+          lightCandleBtn.disabled = false;
+          lightCandleBtn.textContent = 'Tänd ett ljus';
         }
-
-        if (thankYouMessage) {
-            messageForm.style.display = 'none';
-            thankYouMessage.style.display = 'block';
-        }
-      } else {
-        showError(`Meddelandet kunde inte godkännas. Var snäll och försök formulera om det. (${moderationResult.reason})`);
-        lightCandleBtn.disabled = false;
-        lightCandleBtn.textContent = 'Tänd ett ljus';
+      } catch (error) {
+          console.error('Error during form submission:', error);
+          showError('Ett oväntat fel inträffade. Försök igen.');
+          lightCandleBtn.disabled = false;
+          lightCandleBtn.textContent = 'Tänd ett ljus';
       }
     });
   }
