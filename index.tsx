@@ -3,6 +3,8 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
+import { GoogleGenAI, Type } from "@google/genai";
+
 // --- DOM Elements ---
 const memorialScene = document.getElementById('memorial-scene') as HTMLDivElement;
 const candleContainer = document.getElementById('candle-container') as HTMLDivElement;
@@ -12,6 +14,9 @@ const thankYouMessage = document.getElementById('thank-you-message') as HTMLPara
 const messageDisplay = document.getElementById('message-display') as HTMLDivElement;
 const messageText = document.getElementById('message-text') as HTMLParagraphElement;
 const closeMessageBtn = document.getElementById('close-message-btn') as HTMLButtonElement;
+const messageForm = document.getElementById('message-form') as HTMLFormElement;
+const messageInput = document.getElementById('message-input') as HTMLTextAreaElement;
+const errorMessage = document.getElementById('error-message') as HTMLParagraphElement;
 
 
 // --- State and Constants ---
@@ -35,25 +40,98 @@ const predefinedMessages = [
   "För de vi saknar, i evigt minne."
 ];
 
+// --- Gemini AI Setup ---
+let ai: GoogleGenAI | null = null;
+try {
+  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+} catch (error) {
+  console.error("Failed to initialize GoogleGenAI:", error);
+  if (messageForm) {
+    messageForm.style.display = 'none';
+    showError("Kunde inte ansluta till tjänsten. Försök igen senare.");
+  }
+}
+
+/**
+ * Uses Gemini to check if a message is appropriate for the memorial.
+ * @param message The user's message.
+ * @returns An object with `isAppropriate` (boolean) and `reason` (string).
+ */
+async function checkMessageAppropriateness(message: string): Promise<{isAppropriate: boolean, reason: string}> {
+  if (!ai) {
+    return { isAppropriate: false, reason: "AI-tjänsten är inte tillgänglig." };
+  }
+  
+  try {
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: `Analysera följande meddelande för en digital minnesplats för suicidprevention. Är det lämpligt? Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får absolut inte innehålla skadligt språk, uppmana till självskada, vara hatiskt eller innehålla personlig information. Meddelande: "${message}"`,
+      config: {
+        responseMimeType: "application/json",
+        responseSchema: {
+          type: Type.OBJECT,
+          properties: {
+            isAppropriate: {
+              type: Type.BOOLEAN,
+              description: 'Är meddelandet lämpligt enligt riktlinjerna?',
+            },
+            reason: {
+              type: Type.STRING,
+              description: 'En kort anledning om varför det inte är lämpligt.',
+            },
+          },
+          required: ["isAppropriate", "reason"],
+        },
+      },
+    });
+
+    const jsonText = response.text.trim();
+    const result = JSON.parse(jsonText);
+    return {
+        isAppropriate: result.isAppropriate,
+        reason: result.reason || 'Okänt fel.'
+    };
+  } catch (error) {
+    console.error('Error moderating message:', error);
+    return { isAppropriate: false, reason: "Kunde inte verifiera meddelandet. Försök igen." };
+  }
+}
+
+/**
+ * Displays an error message to the user.
+ * @param text The error text to display.
+ */
+function showError(text: string) {
+    if(!errorMessage) return;
+    errorMessage.textContent = text;
+    errorMessage.classList.add('error-visible');
+    errorMessage.classList.remove('error-hidden');
+}
+
+/**
+ * Hides the error message.
+ */
+function hideError() {
+    if(!errorMessage) return;
+    errorMessage.classList.add('error-hidden');
+    errorMessage.classList.remove('error-visible');
+}
+
 /**
  * Creates and adds a single candle element to the scene.
- * @param message - The message to attach to the candle. If null, candle is not clickable.
+ * @param message - The message to attach to the candle.
  * @param isInitial - If true, the candle fades in immediately.
  * @returns The newly created candle element.
  */
-function addCandleToScene(message: string | null, isInitial = false): HTMLDivElement {
+function addCandleToScene(message: string, isInitial = false): HTMLDivElement {
   if (!candleContainer) throw new Error("Candle container not found");
 
   const candle = document.createElement('div');
-  candle.className = 'candle';
-  
-  if (message) {
-    candle.classList.add('has-message');
-    candle.dataset.message = message;
-  }
+  candle.className = 'candle has-message';
+  candle.dataset.message = message;
   
   const x = Math.random() * 95 + 2.5;
-  const y = Math.random() * 95 + 2.5; // Use more vertical space
+  const y = Math.random() * 95 + 2.5;
   candle.style.left = `${x}%`;
   candle.style.top = `${y}%`;
   
@@ -61,14 +139,12 @@ function addCandleToScene(message: string | null, isInitial = false): HTMLDivEle
   candle.style.width = `${size}px`;
   candle.style.height = `${size}px`;
   
-  const flickerDuration = (Math.random() * 2 + 3).toFixed(2); // Random duration between 3s and 5s
+  const flickerDuration = (Math.random() * 2 + 3).toFixed(2); 
 
   if (isInitial) {
-    // Initial candles fade in over 3s. Start flickering after that + a random delay.
     const flickerDelay = (3 + Math.random() * 2).toFixed(2);
     candle.style.animation = `fadeIn 3s ease-out forwards, candleGlow ${flickerDuration}s ease-in-out ${flickerDelay}s infinite alternate`;
   } else {
-    // User-lit candles fade in over 2s with a 0.5s delay. Flicker starts right after.
     const userFadeInDuration = 2;
     const userFadeInDelay = 0.5;
     const flickerStartTime = userFadeInDuration + userFadeInDelay;
@@ -90,7 +166,6 @@ function showSparkleAt(x: number, y: number): void {
   sparkle.className = 'sparkle';
   sparkle.style.left = `${x}px`;
   sparkle.style.top = `${y}px`;
-  // The sparkle is positioned relative to the viewport, so it needs to be outside the candle container.
   document.body.appendChild(sparkle);
   sparkle.addEventListener('animationend', () => {
       sparkle.remove();
@@ -128,12 +203,13 @@ function checkSessionState(): void {
   }
 
   if (sessionData?.hasLit) {
-    if (lightCandleBtn && thankYouMessage) {
-      lightCandleBtn.style.display = 'none';
+    if (messageForm && thankYouMessage) {
+      messageForm.style.display = 'none';
       thankYouMessage.style.display = 'block';
     }
-    // Add a non-clickable candle for the returning user
-    addCandleToScene(null, true);
+    if (sessionData.message) {
+        addCandleToScene(sessionData.message, true);
+    }
   }
 }
 
@@ -147,19 +223,12 @@ function showMessage(candle: HTMLElement): void {
 
   messageText.textContent = `"${message}"`;
   
-  // Position the modal near the candle
   const candleRect = candle.getBoundingClientRect();
-
-  // Calculate position relative to the viewport
   const viewX = candleRect.left + (candleRect.width / 2);
   const viewY = candleRect.top + (candleRect.height / 2);
 
   messageDisplay.style.left = `${viewX}px`;
   messageDisplay.style.top = `${viewY}px`;
-  
-  // Adjust position to not go off-screen
-  messageDisplay.style.transform = 'translate(-50%, -120%)';
-
   messageDisplay.classList.remove('hidden');
   messageDisplay.classList.add('visible');
 }
@@ -170,12 +239,7 @@ function showMessage(candle: HTMLElement): void {
 function hideMessage(): void {
   if (!messageDisplay) return;
   messageDisplay.classList.remove('visible');
-  // Use a timeout to allow fade-out animation before setting display to none
-  setTimeout(() => {
-    if (!messageDisplay.classList.contains('visible')) {
-        messageDisplay.classList.add('hidden');
-    }
-  }, 300);
+  messageDisplay.classList.add('hidden');
 }
 
 /**
@@ -191,9 +255,9 @@ function createShootingStar(): void {
   star.className = 'shooting-star';
 
   const startX = Math.random() * window.innerWidth;
-  const startY = Math.random() * window.innerHeight * 0.4; // Appear in top 40% of screen
-  const angle = Math.random() * 45 + 20; // Angle between 20 and 65 degrees
-  const duration = Math.random() * 2 + 1.5; // 1.5s to 3.5s animation
+  const startY = Math.random() * window.innerHeight * 0.4;
+  const angle = Math.random() * 45 + 20;
+  const duration = Math.random() * 2 + 1.5;
 
   wrapper.style.left = `${startX}px`;
   wrapper.style.top = `${startY}px`;
@@ -220,7 +284,6 @@ function scheduleNextShootingStar(): void {
   }, delay);
 }
 
-
 /**
  * Initializes the memorial scene.
  */
@@ -235,38 +298,50 @@ function initialize(): void {
   scheduleNextShootingStar();
 
   // --- Event Listeners ---
-  if (lightCandleBtn) {
-    lightCandleBtn.addEventListener('click', () => {
-      // Disable button immediately to prevent double clicks
-      lightCandleBtn.disabled = true;
-
-      // Add a candle without a message and get the element back
-      const newCandle = addCandleToScene(null, false);
-      updateView();
-
-      // Show a sparkle effect where the new candle appeared.
-      // We need to wait a frame for the candle to be positioned.
-      requestAnimationFrame(() => {
-          const candleRect = newCandle.getBoundingClientRect();
-          const x = candleRect.left + candleRect.width / 2;
-          const y = candleRect.top + candleRect.height / 2;
-          showSparkleAt(x, y);
-      });
-
-      // Save state to local storage
-      try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true }));
-      } catch (e) {
-          console.error('Could not save to localStorage', e);
+  if (messageForm) {
+    messageForm.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (!messageInput.value.trim()) {
+        showError("Vänligen skriv ett meddelande.");
+        return;
       }
+      
+      hideError();
+      lightCandleBtn.disabled = true;
+      lightCandleBtn.textContent = 'Tänder ljus...';
 
-      // Update the UI to show thank you message
-      if (thankYouMessage) {
-          lightCandleBtn.style.display = 'none';
-          thankYouMessage.style.display = 'block';
+      const message = messageInput.value.trim();
+      const moderationResult = await checkMessageAppropriateness(message);
+
+      if (moderationResult.isAppropriate) {
+        const newCandle = addCandleToScene(message, false);
+        updateView();
+
+        requestAnimationFrame(() => {
+            const candleRect = newCandle.getBoundingClientRect();
+            const x = candleRect.left + candleRect.width / 2;
+            const y = candleRect.top + candleRect.height / 2;
+            showSparkleAt(x, y);
+        });
+
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
+        } catch (err) {
+            console.error('Could not save to localStorage', err);
+        }
+
+        if (thankYouMessage) {
+            messageForm.style.display = 'none';
+            thankYouMessage.style.display = 'block';
+        }
+      } else {
+        showError(`Meddelandet kunde inte godkännas. Var snäll och försök formulera om det. (${moderationResult.reason})`);
+        lightCandleBtn.disabled = false;
+        lightCandleBtn.textContent = 'Tänd ett ljus';
       }
     });
   }
+
   if(candleContainer) {
     candleContainer.addEventListener('click', (e) => {
         const target = e.target as HTMLElement;
@@ -275,16 +350,16 @@ function initialize(): void {
         }
     });
   }
+
   if(closeMessageBtn) {
     closeMessageBtn.addEventListener('click', hideMessage);
   }
-  // Hide message when clicking outside
+
   document.addEventListener('click', (e) => {
     if (messageDisplay?.classList.contains('visible') && !messageDisplay.contains(e.target as Node) && !(e.target as HTMLElement).classList.contains('candle')) {
         hideMessage();
     }
   });
-
 }
 
 // --- Start the application ---
