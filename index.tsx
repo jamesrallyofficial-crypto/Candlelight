@@ -3,8 +3,6 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import { GoogleGenAI, Type } from "@google/genai";
-
 // --- DOM Elements ---
 const memorialScene = document.getElementById('memorial-scene') as HTMLDivElement;
 const candleContainer = document.getElementById('candle-container') as HTMLDivElement;
@@ -39,68 +37,6 @@ const predefinedMessages = [
   "Var snäll mot dig själv.",
   "För de vi saknar, i evigt minne."
 ];
-
-// --- Gemini AI Setup ---
-let ai: GoogleGenAI | null = null;
-try {
-  ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-} catch (error) {
-  console.error("Failed to initialize GoogleGenAI:", error);
-  if (messageForm) {
-    messageForm.style.display = 'none';
-    showError("Kunde inte ansluta till tjänsten. Försök igen senare.");
-  }
-}
-
-/**
- * Cleans potential markdown formatting from a string and parses it as JSON.
- * @param jsonText The raw text from the AI response.
- * @returns The parsed JavaScript object.
- */
-function cleanAndParseJson(jsonText: string): any {
-    let cleanText = jsonText.trim();
-    const match = cleanText.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (match) {
-        cleanText = match[1];
-    }
-    return JSON.parse(cleanText);
-}
-
-
-/**
- * Uses Gemini to check if a message is appropriate for the memorial.
- * @param message The user's message.
- * @returns An object with `isAppropriate` (boolean) and `reason` (string).
- */
-async function checkMessageAppropriateness(message: string): Promise<{isAppropriate: boolean, reason: string}> {
-  if (!ai) {
-    return { isAppropriate: false, reason: "AI-tjänsten är inte tillgänglig." };
-  }
-  
-  try {
-    const prompt = `Analysera meddelandet för en minnesplats för suicidprevention. Meddelandet ska vara stödjande, hoppfullt eller ett respektfullt minne. Det får inte innehålla skadligt, hatiskt, självskadeuppmanande innehåll, eller personlig information.
-Svara ENDAST med ett JSON-objekt med exakt denna struktur: { "isAppropriate": boolean, "reason": string }.
-"isAppropriate" ska vara true om meddelandet är lämpligt, annars false. "reason" ska vara en kort förklaring om det är olämpligt, annars en tom sträng.
-Meddelande: "${message}"`;
-
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: prompt,
-      config: {
-        responseMimeType: "application/json",
-      },
-    });
-
-    const result = cleanAndParseJson(response.text);
-    return {
-        isAppropriate: result.isAppropriate === true, // Ensure it's a strict boolean
-        reason: result.reason || 'Okänt fel.'
-    };
-  } catch (error) {
-    console.error('Error moderating message:', error);
-    return { isAppropriate: false, reason: "Kunde inte verifiera meddelandet. Försök igen." };
-  }
-}
 
 /**
  * Displays an error message to the user.
@@ -306,9 +242,10 @@ function initialize(): void {
 
   // --- Event Listeners ---
   if (messageForm) {
-    messageForm.addEventListener('submit', async (e) => {
+    messageForm.addEventListener('submit', (e) => {
       e.preventDefault();
-      if (!messageInput.value.trim()) {
+      const message = messageInput.value.trim();
+      if (!message) {
         showError("Vänligen skriv ett meddelande.");
         return;
       }
@@ -317,41 +254,25 @@ function initialize(): void {
       lightCandleBtn.disabled = true;
       lightCandleBtn.textContent = 'Tänder ljus...';
 
+      const newCandle = addCandleToScene(message, false);
+      updateView();
+
+      requestAnimationFrame(() => {
+          const candleRect = newCandle.getBoundingClientRect();
+          const x = candleRect.left + candleRect.width / 2;
+          const y = candleRect.top + candleRect.height / 2;
+          showSparkleAt(x, y);
+      });
+
       try {
-        const message = messageInput.value.trim();
-        const moderationResult = await checkMessageAppropriateness(message);
+          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
+      } catch (err) {
+          console.error('Could not save to localStorage', err);
+      }
 
-        if (moderationResult.isAppropriate) {
-          const newCandle = addCandleToScene(message, false);
-          updateView();
-
-          requestAnimationFrame(() => {
-              const candleRect = newCandle.getBoundingClientRect();
-              const x = candleRect.left + candleRect.width / 2;
-              const y = candleRect.top + candleRect.height / 2;
-              showSparkleAt(x, y);
-          });
-
-          try {
-              localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
-          } catch (err) {
-              console.error('Could not save to localStorage', err);
-          }
-
-          if (thankYouMessage) {
-              messageForm.style.display = 'none';
-              thankYouMessage.style.display = 'block';
-          }
-        } else {
-          showError(`Meddelandet kunde inte godkännas. Var snäll och försök formulera om det. (${moderationResult.reason})`);
-          lightCandleBtn.disabled = false;
-          lightCandleBtn.textContent = 'Tänd ett ljus';
-        }
-      } catch (error) {
-          console.error('Error during form submission:', error);
-          showError('Ett oväntat fel inträffade. Försök igen.');
-          lightCandleBtn.disabled = false;
-          lightCandleBtn.textContent = 'Tänd ett ljus';
+      if (thankYouMessage) {
+          messageForm.style.display = 'none';
+          thankYouMessage.style.display = 'block';
       }
     });
   }
