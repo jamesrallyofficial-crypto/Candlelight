@@ -122,15 +122,15 @@ function updateView() {
   }
 
   if (candleContainer) {
-    const candlesAddedByUser = Math.max(0, candleCount - INITIAL_CANDLE_COUNT);
-    const scale = 1 - (candlesAddedByUser * ZOOM_FACTOR_PER_CANDLE);
+    const userAddedCandles = Math.max(0, candleCount - INITIAL_CANDLE_COUNT);
+    const scale = 1 - (userAddedCandles * ZOOM_FACTOR_PER_CANDLE);
     const finalScale = Math.max(MAX_ZOOM_OUT, scale);
     candleContainer.style.transform = `scale(${finalScale})`;
   }
 }
 
 /**
- * Checks if the user has already lit a candle in a previous session.
+ * Checks if the user has already lit a candle in a previous session to hide the form.
  */
 function checkSessionState() {
   let sessionData = null;
@@ -147,9 +147,6 @@ function checkSessionState() {
     if (messageForm && thankYouMessage) {
       messageForm.style.display = 'none';
       thankYouMessage.style.display = 'block';
-    }
-    if (sessionData.message) {
-        addCandleToScene(sessionData.message, true);
     }
   }
 }
@@ -192,15 +189,12 @@ function createShootingStar() {
     const star = document.createElement('div');
     star.className = 'shooting-star';
 
-    // Define a trajectory across the screen
     const startX = Math.random() * window.innerWidth;
-    const startY = -50; // Start above the screen
+    const startY = -50;
     const endX = Math.random() * window.innerWidth;
-    const endY = window.innerHeight + 50; // End below the screen
+    const endY = window.innerHeight + 50;
+    const duration = Math.random() * 4 + 6;
 
-    const duration = Math.random() * 4 + 6; // Slower, more majestic: 6-10 seconds
-
-    // Set custom properties for the animation
     star.style.setProperty('--start-x', `${startX}px`);
     star.style.setProperty('--start-y', `${startY}px`);
     star.style.setProperty('--end-x', `${endX}px`);
@@ -214,13 +208,12 @@ function createShootingStar() {
     memorialScene.appendChild(star);
 }
 
-
 /**
  * Schedules the next shooting star to appear after a random delay.
  * @param {boolean} [isFirst=false] - If true, schedule the first star to appear quickly.
  */
 function scheduleNextShootingStar(isFirst = false) {
-  const delay = isFirst ? 2000 : Math.random() * 15000 + 10000; // First in 2s, then 10-25s
+  const delay = isFirst ? 2000 : Math.random() * 15000 + 10000;
   setTimeout(() => {
     createShootingStar();
     scheduleNextShootingStar();
@@ -228,12 +221,27 @@ function scheduleNextShootingStar(isFirst = false) {
 }
 
 /**
- * Initializes the memorial scene.
+ * Initializes the memorial scene by fetching candle data from the server.
  */
-function initialize() {
+async function initialize() {
+  // Add the predefined "base" candles first
   for (let i = 0; i < INITIAL_CANDLE_COUNT; i++) {
     const message = predefinedMessages[i % predefinedMessages.length];
     addCandleToScene(message, true);
+  }
+
+  // Fetch user-submitted candles from the server
+  try {
+    const response = await fetch('/api/candles');
+    if (!response.ok) {
+        throw new Error(`Server responded with ${response.status}`);
+    }
+    const data = await response.json();
+    data.messages.forEach(message => {
+        addCandleToScene(message, true);
+    });
+  } catch (error) {
+      console.error("Failed to load user-lit candles:", error);
   }
 
   checkSessionState();
@@ -242,7 +250,7 @@ function initialize() {
 
   // --- Event Listeners ---
   if (messageForm) {
-    messageForm.addEventListener('submit', (e) => {
+    messageForm.addEventListener('submit', async (e) => {
       e.preventDefault();
       const message = messageInput.value.trim();
       if (!message) {
@@ -254,25 +262,43 @@ function initialize() {
       lightCandleBtn.disabled = true;
       lightCandleBtn.textContent = 'Tänder ljus...';
 
-      const newCandle = addCandleToScene(message, false);
-      updateView();
-
-      requestAnimationFrame(() => {
-          const candleRect = newCandle.getBoundingClientRect();
-          const x = candleRect.left + candleRect.width / 2;
-          const y = candleRect.top + candleRect.height / 2;
-          showSparkleAt(x, y);
-      });
-
       try {
-          localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true, message: message }));
-      } catch (err) {
-          console.error('Could not save to localStorage', err);
-      }
+        const response = await fetch('/api/candles', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: message }),
+        });
 
-      if (thankYouMessage) {
-          messageForm.style.display = 'none';
-          thankYouMessage.style.display = 'block';
+        if (!response.ok) {
+            throw new Error(`Server responded with ${response.status}`);
+        }
+        
+        const newCandle = addCandleToScene(message, false);
+        updateView();
+
+        requestAnimationFrame(() => {
+            const candleRect = newCandle.getBoundingClientRect();
+            const x = candleRect.left + candleRect.width / 2;
+            const y = candleRect.top + candleRect.height / 2;
+            showSparkleAt(x, y);
+        });
+
+        try {
+            localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({ hasLit: true }));
+        } catch (err) {
+            console.error('Could not save to localStorage', err);
+        }
+
+        if (thankYouMessage) {
+            messageForm.style.display = 'none';
+            thankYouMessage.style.display = 'block';
+        }
+
+      } catch (error) {
+        console.error("Failed to submit candle:", error);
+        showError("Kunde inte tända ljuset. Försök igen.");
+        lightCandleBtn.disabled = false;
+        lightCandleBtn.textContent = 'Tänd ett ljus';
       }
     });
   }
